@@ -1,7 +1,7 @@
 (defpackage :web-object-capabilities/mongo
   (:use :cl :alexandria :cl-mongo)
   (:import-from :web-object-capabilities/key #:new-key-string)
-  (:export #:create-key! #:find-document #:set-document-value! #:first-time? #:create-first-time-key! #:store-config! #:get-config))
+  (:export #:create-key! #:find-document #:set-document-value! #:first-time? #:create-first-time-key! #:store-config! #:get-config #:get-element))
 
 (in-package :web-object-capabilities/mongo)
 
