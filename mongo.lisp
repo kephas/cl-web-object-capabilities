@@ -17,8 +17,10 @@
 (defun find-document (key)
   (first (docs (db.find "keys" (kv (kv "key" key))))))
 
-(defun set-document-value! (key name value)
-  (if-let (doc (find-document key))
+(defun set-document-value! (key/doc name value)
+  (if-let (doc (if (stringp key/doc)
+				   (find-document key/doc)
+				   key/doc))
 	(progn
 	  (add-element name value doc)
 	  (db.save "keys" doc))))
