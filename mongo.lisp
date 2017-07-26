@@ -1,7 +1,9 @@
 (defpackage :web-object-capabilities/mongo
-  (:use :cl :alexandria :cl-mongo)
+  (:use :cl :alexandria :cl-mongo :scheme :metabang-bind)
   (:import-from :web-object-capabilities/key #:new-key-string)
-  (:export #:create-key! #:find-document #:set-document-value! #:first-time? #:create-first-time-key! #:store-config! #:get-config #:get-element))
+  (:import-from :closer-mop #:class-slots #:slot-definition-name)
+  (:export #:create-key! #:find-document #:set-document-value! #:first-time? #:create-first-time-key! #:store-config! #:get-config #:get-element
+		   #:write-object #:read-object))
 
 (in-package :web-object-capabilities/mongo)
 
@@ -43,3 +45,32 @@
 
 (defun get-config (name)
   (get-element "value" (first (docs (db.find "config" (kv "name" name))))))
+
+
+(defun write-object (object key fields)
+  (let ((root (find-document key)))
+	(let@ rec ((document root)
+			   (fields fields))
+	  (if fields
+		  (rec (get-element (first fields) document) (rest fields))
+		  (progn
+			(dolist (slot (mapcar #'slot-definition-name (class-slots (class-of object))))
+			  (when (slot-boundp object slot)
+				(add-element (string slot) (slot-value object slot) document)))
+			(db.save +keys+ root))))))
+
+(defun read-object (object key fields)
+  (let ((root (find-document key)))
+	(let@ rec ((document root)
+			   (fields fields))
+	  (if fields
+		  (rec (get-element (first fields) document) (rest fields))
+		  (dolist (slot (mapcar #'slot-definition-name (class-slots (class-of object))))
+			(bind (((:values value found?) (get-element (string slot) document)))
+			  (when found?
+				(setf (slot-value object slot) value))))))))
+
+(defun remake-object (class key fields)
+  (let ((object (make-instance class)))
+	(read-object object key fields)
+	object))
