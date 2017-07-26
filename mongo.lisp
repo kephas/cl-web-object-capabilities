@@ -3,7 +3,8 @@
   (:import-from :web-object-capabilities/key #:new-key-string)
   (:import-from :closer-mop #:class-slots #:slot-definition-name)
   (:export #:create-key! #:find-document #:set-document-value! #:first-time? #:create-first-time-key! #:store-config! #:get-config #:get-element
-		   #:write-object #:read-object))
+		   #:serialize #:unserialize
+		   #:write-object #:read-object #:remake-object))
 
 (in-package :web-object-capabilities/mongo)
 
@@ -47,16 +48,38 @@
   (get-element "value" (first (docs (db.find "config" (kv "name" name))))))
 
 
+#| Very crude serialization functions |#
+
+(defgeneric serialize (object))
+
+(defmethod serialize ((object string)) object)
+(defmethod serialize ((object number)) object)
+(defmethod serialize ((object (eql t))) object) ; (object boolean) didn't work
+(defmethod serialize ((object (eql nil))) object)
+
+
+(defgeneric unserialize (parent slot object))
+
+(defmethod unserialize (parent slot (object string)) (declare (ignore parent slot)) object)
+(defmethod unserialize (parent slot (object number)) (declare (ignore parent slot)) object)
+(defmethod unserialize (parent slot (object (eql t))) (declare (ignore parent slot)) object)
+(defmethod unserialize (parent slot (object (eql nil))) (declare (ignore parent slot)) object)
+
+
 (defun write-object (object key fields)
   (let ((root (find-document key)))
 	(let@ rec ((document root)
 			   (fields fields))
 	  (if fields
-		  (rec (get-element (first fields) document) (rest fields))
+		  (let ((subdoc (get-element (first fields) document)))
+			(unless subdoc
+			  (setf subdoc (make-document))
+			  (add-element (first fields) subdoc document))
+			(rec subdoc (rest fields)))
 		  (progn
 			(dolist (slot (mapcar #'slot-definition-name (class-slots (class-of object))))
 			  (when (slot-boundp object slot)
-				(add-element (string slot) (slot-value object slot) document)))
+				(add-element (string slot) (serialize (slot-value object slot)) document)))
 			(db.save +keys+ root))))))
 
 (defun read-object (object key fields)
@@ -68,7 +91,7 @@
 		  (dolist (slot (mapcar #'slot-definition-name (class-slots (class-of object))))
 			(bind (((:values value found?) (get-element (string slot) document)))
 			  (when found?
-				(setf (slot-value object slot) value))))))))
+				(setf (slot-value object slot) (unserialize object slot value)))))))))
 
 (defun remake-object (class key fields)
   (let ((object (make-instance class)))
