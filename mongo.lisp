@@ -7,15 +7,16 @@
 
 
 (defparameter +admin+ "ADMIN")
+(defparameter +keys+ "keys")
 
 
 (defun create-key! (type &rest kvs)
   (let ((key (new-key-string)))
-	(db.insert "keys" (apply #'kv (kv "key" key) (kv "type" type) kvs))
+	(db.insert +keys+ (apply #'kv (kv "key" key) (kv "type" type) kvs))
 	key))
 
 (defun find-document (key)
-  (first (docs (db.find "keys" (kv (kv "key" key))))))
+  (first (docs (db.find +keys+ (kv (kv "key" key))))))
 
 (defun set-document-value! (key/doc name value)
   (if-let (doc (if (stringp key/doc)
@@ -23,11 +24,11 @@
 				   key/doc))
 	(progn
 	  (add-element name value doc)
-	  (db.save "keys" doc))))
+	  (db.save +keys+ doc))))
 
 
 (defun first-time? ()
-  (not (docs (db.find "keys" (kv "type" +admin+)))))
+  (not (docs (db.find +keys+ (kv "type" +admin+)))))
 
 (defun create-first-time-key! ()
   "Create the first admin key or return NIL if already created"
